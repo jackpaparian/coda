@@ -4,17 +4,21 @@
 "/src/config.mlh"]
 
 open Core
-open Import
-open Coda_numbers
 open Currency
 open Snark_bits
 open Fold_lib
+open Import
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 open Snark_params
 open Tick
+open Coda_numbers
+
+[%%else]
+
+open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -32,14 +36,14 @@ module Index = struct
 
   let to_int = Int.to_int
 
-  let gen = Int.gen_incl 0 ((1 lsl Snark_params.ledger_depth) - 1)
+  let gen = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
 
   module Table = Int.Table
 
   module Vector = struct
     include Int
 
-    let length = Snark_params.ledger_depth
+    let length = ledger_depth
 
     let empty = zero
 
@@ -55,7 +59,12 @@ module Index = struct
 
   let fold t = Fold.group3 ~default:false (fold_bits t)
 
+  [%%ifdef
+  consensus_mechanism]
+
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
+
+  [%%endif]
 end
 
 module Nonce = Account_nonce
@@ -193,8 +202,8 @@ module Timing = struct
           ; vesting_period
           ; vesting_increment }
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   type var =
     (Boolean.var, Global_slot.Checked.var, Balance.var, Amount.var) As_record.t
@@ -435,8 +444,8 @@ let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
     (Random_oracle.pack_input (to_input t))
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 type var =
   ( Public_key.Compressed.var

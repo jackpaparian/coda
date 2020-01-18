@@ -1,5 +1,18 @@
+(* receipt.mli *)
+
+[%%import "/src/config.mlh"]
+
+open Core_kernel
+
+[%%ifdef consensus_mechanism]
+
 open Snark_params.Tick
-open Core
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+[%%endif]
 
 module Chain_hash : sig
   include Data_hash.Full_size

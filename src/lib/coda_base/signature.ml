@@ -4,8 +4,8 @@
 open Core
 open Module_version
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 open Snark_params.Tick
 
@@ -85,8 +85,8 @@ type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
 let dummy = (Field.one, Inner_curve.Scalar.one)
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 type var = Field.Var.t * Inner_curve.Scalar.var
 
