@@ -7,7 +7,8 @@
 consensus_mechanism]
 
 [%%error
-"Snark_params_nonconsensus cannot be used when building code for consensus"]
+"Snark_params_nonconsensus should not be compiled if there's a consensus \
+ mechanism"]
 
 [%%endif]
 
@@ -62,4 +63,20 @@ module Inner_curve = struct
 
   [%%define_locally
   G1.(to_affine_exn, of_affine)]
+
+  module Scalar = struct
+    (* not versioned here; this type exists for Private_key.t, where it 
+       is versioned-asserted and its serialization tested
+       we make linter error a warning
+     *)
+    type t = Bigint.t [@@deriving bin_io, sexp]
+
+    (* the Inner_curve.Scalar.size for the consensus case is derived from a C++ call; here, we inline the value *)
+    let size =
+      Bigint.of_string
+        "475922286169261325753349249653048451545124879242694725395555128576210262817955800483758081"
+
+    [%%define_locally
+    Bigint.(to_string, of_string)]
+  end
 end

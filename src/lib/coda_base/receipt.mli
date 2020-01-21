@@ -2,15 +2,10 @@
 
 [%%import "/src/config.mlh"]
 
-open Core_kernel
-
 [%%ifdef consensus_mechanism]
 
+open Core_kernel
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -19,8 +14,6 @@ module Chain_hash : sig
 
   include Codable.S with type t := t
 
-  val gen : t Quickcheck.Generator.t
-
   val to_string : t -> string
 
   val of_string : string -> t
@@ -28,6 +21,10 @@ module Chain_hash : sig
   val empty : t
 
   val cons : User_command.Payload.t -> t -> t
+
+  [%%ifdef consensus_mechanism]
+
+  val gen : t Quickcheck.Generator.t
 
   module Checked : sig
     val constant : t -> var
@@ -38,4 +35,6 @@ module Chain_hash : sig
 
     val cons : payload:Transaction_union_payload.var -> t -> (t, _) Checked.t
   end
+
+  [%%endif]
 end

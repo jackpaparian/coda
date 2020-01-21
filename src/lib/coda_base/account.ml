@@ -4,23 +4,27 @@
 "/src/config.mlh"]
 
 open Core
-open Currency
-open Snark_bits
-open Fold_lib
-open Import
 
 [%%ifdef
 consensus_mechanism]
 
 open Snark_params
 open Tick
-open Coda_numbers
 
 [%%else]
 
 open Snark_params_nonconsensus
+module Currency = Currency_nonconsensus.Currency
+module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
+
+open Currency
+open Coda_numbers
+open Snark_bits
+open Fold_lib
+open Import
 
 module Index = struct
   [%%versioned
@@ -202,6 +206,21 @@ module Timing = struct
           ; vesting_period
           ; vesting_increment }
 
+  let to_bits t =
+    let As_record.
+          { is_timed
+          ; initial_minimum_balance
+          ; cliff_time
+          ; vesting_period
+          ; vesting_increment } =
+      to_record t
+    in
+    is_timed
+    :: ( Balance.to_bits initial_minimum_balance
+       @ Global_slot.to_bits cliff_time
+       @ Global_slot.to_bits vesting_period
+       @ Amount.to_bits vesting_increment )
+
   [%%ifdef
   consensus_mechanism]
 
@@ -244,21 +263,6 @@ module Timing = struct
       ; vesting_increment= Amount.var_of_t vesting_increment }
 
   let untimed_var = var_of_t Untimed
-
-  let to_bits t =
-    let As_record.
-          { is_timed
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment } =
-      to_record t
-    in
-    is_timed
-    :: ( Balance.to_bits initial_minimum_balance
-       @ Global_slot.to_bits cliff_time
-       @ Global_slot.to_bits vesting_period
-       @ Amount.to_bits vesting_increment )
 
   let typ : (var, t) Typ.t =
     let spec =

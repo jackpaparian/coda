@@ -3,6 +3,15 @@
 
 open Core
 open Import
+
+[%%ifndef
+consensus_mechanism]
+
+module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
+
 open Coda_numbers
 module Fee = Currency.Fee
 module Payload = User_command_payload

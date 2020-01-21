@@ -8,65 +8,46 @@ open Module_version
 [%%ifdef
 consensus_mechanism]
 
-open Snark_params
+open Snark_params.Tick
 
 [%%else]
 
-(* the Inner_curve.Scalar.size for the consensus case is derived from a C++ call; here, we inline the value *)
-let inner_curve_scalar_size =
-  Bignum_bigint.of_string
-    "475922286169261325753349249653048451545124879242694725395555128576210262817955800483758081"
+open Snark_params_nonconsensus
 
 [%%endif]
 
 [%%versioned_asserted
 module Stable = struct
-  [%%ifdef
-  consensus_mechanism]
-
   module V1 = struct
-    type t = Tick.Inner_curve.Scalar.t [@@deriving sexp]
+    type t = Inner_curve.Scalar.t [@@deriving sexp]
 
     let to_latest = Fn.id
 
-    let to_yojson t = `String (Tick.Inner_curve.Scalar.to_string t)
+    let to_yojson t = `String (Inner_curve.Scalar.to_string t)
 
     let of_yojson = function
       | `String s ->
-          Ok (Tick.Inner_curve.Scalar.of_string s)
+          Ok (Inner_curve.Scalar.of_string s)
       | _ ->
           Error "Private_key.of_yojson expected `String"
+
+    [%%ifdef
+    consensus_mechanism]
 
     let gen =
       let open Bignum_bigint in
       Quickcheck.Generator.map
         (gen_uniform_incl one (Snark_params.Tick.Inner_curve.Scalar.size - one))
         ~f:Snark_params.Tock.Bigint.(Fn.compose to_field of_bignum_bigint)
-  end
 
-  [%%else]
-
-  module V1 = struct
-    (* when building for consensus, the type is derived via a series of functors
-       that pull in lots of code from snarky; here, the type is just enough
-    *)
-    type t = Bignum_bigint.t [@@deriving sexp]
-
-    let to_latest = Fn.id
-
-    let to_yojson t = `String (Bignum_bigint.to_string t)
-
-    let of_yojson = function
-      | `String s ->
-          Ok (Bignum_bigint.of_string s)
-      | _ ->
-          Error "Private_key.of_yojson expected `String"
+    [%%else]
 
     let gen =
-      Bignum_bigint.(gen_uniform_incl one (inner_curve_scalar_size - one))
-  end
+      let open Bignum_bigint in
+      gen_uniform_incl one (Inner_curve.Scalar.size - one)
 
-  [%%endif]
+    [%%endif]
+  end
 
   (* see lib/module_version/README-version-asserted.md *)
   module Tests = struct
