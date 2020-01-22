@@ -53,6 +53,16 @@ module Field = struct
       (of_bits bits)
 end
 
+module Tock = struct
+  module Field = struct
+    type t = Bigint.t
+
+    let unpack _t = Obj.magic 42
+
+    let project _t = Obj.magic 42
+  end
+end
+
 module Inner_curve = struct
   open Field
   module Coefficients = G1.Coefficients
@@ -65,11 +75,13 @@ module Inner_curve = struct
   G1.(to_affine_exn, of_affine)]
 
   module Scalar = struct
-    (* not versioned here; this type exists for Private_key.t, where it 
-       is versioned-asserted and its serialization tested
+    (* though we have bin_io, not versioned here; this type exists for Private_key.t, 
+       where it is versioned-asserted and its serialization tested
        we make linter error a warning
      *)
     type t = Bigint.t [@@deriving bin_io, sexp]
+
+    type _unused = unit constraint t = Tock.Field.t
 
     (* the Inner_curve.Scalar.size for the consensus case is derived from a C++ call; here, we inline the value *)
     let size =
@@ -77,6 +89,10 @@ module Inner_curve = struct
         "475922286169261325753349249653048451545124879242694725395555128576210262817955800483758081"
 
     [%%define_locally
-    Bigint.(to_string, of_string)]
+    Bigint.(to_string, of_string, equal, compare, hash_fold_t, one)]
+
+    let gen = Bigint.(gen_uniform_incl one (size - one))
+
+    let of_bits bits = Tock.Field.project bits
   end
 end

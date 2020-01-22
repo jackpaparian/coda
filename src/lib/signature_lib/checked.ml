@@ -8,11 +8,22 @@ open Snarky
 module type Message_intf = sig
   type field
 
+  type t
+
+  type curve
+
+  val derive :
+    t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
+
+  val hash : t -> public_key:curve -> r:field -> curve_scalar
+
+  [%%ifdef consensus_mechanism]
+
   type field_var
 
   type boolean_var
 
-  type curve
+  type var
 
   type curve_var
 
@@ -22,17 +33,10 @@ module type Message_intf = sig
 
   type (_, _) checked
 
-  type t
-
-  type var
-
-  val derive :
-    t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
-
-  val hash : t -> public_key:curve -> r:field -> curve_scalar
-
   val hash_checked :
     var -> public_key:curve_var -> r:field_var -> (curve_scalar_var, _) checked
+
+  [%%endif]
 end
 
 module type S = sig
@@ -283,12 +287,8 @@ module Schnorr
   end
 end
 
-open Snark_params
-
 module Message = struct
   include Tick.Field
-
-  type var = Tick.Field.Var.t
 
   let derive t ~private_key ~public_key =
     let input =
@@ -303,13 +303,23 @@ module Message = struct
     let x, y = Tick.Inner_curve.to_affine_exn public_key in
     Tick.Field.unpack Random_oracle.(hash [|t; r; x; y|]) |> Tock.Field.project
 
+  [%%ifdef
+  consensus_mechanism]
+
+  type var = Tick.Field.Var.t
+
   let hash_checked t ~public_key ~r =
     Tick.make_checked (fun () ->
         let x, y = public_key in
         Random_oracle.Checked.hash [|t; r; x; y|]
         |> Tick.Run.Field.choose_preimage_var ~length:Tick.Field.size_in_bits
         |> Bitstring_lib.Bitstring.Lsb_first.of_list )
+
+  [%%endif]
 end
+
+[%%ifdef
+consensus_mechanism]
 
 module S = Schnorr (Tick) (Tick.Inner_curve) (Message)
 
@@ -334,3 +344,5 @@ let%test_unit "schnorr checked + unchecked" =
            S.Checked.verifies (module Shifted) s public_key msg )
          (fun _ -> true))
         (pubkey, msg, s) )
+
+[%%endif]

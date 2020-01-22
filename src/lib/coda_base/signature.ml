@@ -9,6 +9,10 @@ consensus_mechanism]
 
 open Snark_params.Tick
 
+[%%else]
+
+open Snark_params_nonconsensus
+
 [%%endif]
 
 module Arg = struct

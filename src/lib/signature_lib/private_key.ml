@@ -42,9 +42,7 @@ module Stable = struct
 
     [%%else]
 
-    let gen =
-      let open Bignum_bigint in
-      gen_uniform_incl one (Inner_curve.Scalar.size - one)
+    let gen = Inner_curve.Scalar.gen
 
     [%%endif]
   end
