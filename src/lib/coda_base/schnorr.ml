@@ -96,4 +96,6 @@ consensus_mechanism]
 include Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
           (Message)
 
+[%%else]
+
 [%%endif]

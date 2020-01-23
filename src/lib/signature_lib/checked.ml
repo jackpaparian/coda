@@ -12,6 +12,8 @@ module type Message_intf = sig
 
   type curve
 
+  type curve_scalar
+
   val derive :
     t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
 
@@ -27,8 +29,6 @@ module type Message_intf = sig
 
   type curve_var
 
-  type curve_scalar
-
   type curve_scalar_var
 
   type (_, _) checked
@@ -38,6 +38,9 @@ module type Message_intf = sig
 
   [%%endif]
 end
+
+[%%ifdef
+consensus_mechanism]
 
 module type S = sig
   module Impl : Snark_intf.S
@@ -287,6 +290,8 @@ module Schnorr
   end
 end
 
+open Snark_params
+
 module Message = struct
   include Tick.Field
 
@@ -303,9 +308,6 @@ module Message = struct
     let x, y = Tick.Inner_curve.to_affine_exn public_key in
     Tick.Field.unpack Random_oracle.(hash [|t; r; x; y|]) |> Tock.Field.project
 
-  [%%ifdef
-  consensus_mechanism]
-
   type var = Tick.Field.Var.t
 
   let hash_checked t ~public_key ~r =
@@ -314,12 +316,7 @@ module Message = struct
         Random_oracle.Checked.hash [|t; r; x; y|]
         |> Tick.Run.Field.choose_preimage_var ~length:Tick.Field.size_in_bits
         |> Bitstring_lib.Bitstring.Lsb_first.of_list )
-
-  [%%endif]
 end
-
-[%%ifdef
-consensus_mechanism]
 
 module S = Schnorr (Tick) (Tick.Inner_curve) (Message)
 
@@ -344,5 +341,37 @@ let%test_unit "schnorr checked + unchecked" =
            S.Checked.verifies (module Shifted) s public_key msg )
          (fun _ -> true))
         (pubkey, msg, s) )
+
+[%%else]
+
+module Schnorr
+    (Impl : module type of Snark_params_nonconsensus) (Curve : sig
+        open Impl
+
+        include module type of Snark_params_nonconsensus.Inner_curve
+    end)
+    (Message : Message_intf
+               with type curve := Curve.t
+                and type curve_scalar := Curve.Scalar.t
+                and type field := Impl.Field.t) =
+struct
+  let is_even (t : Impl.Field.t) = not @@ Impl.Field.parity t (* TODO ???? *)
+
+  let sign (d_prime : Private_key.t) m =
+    let public_key =
+      (* TODO: Don't recompute this. *) Curve.scale Curve.one d_prime
+    in
+    (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
+    let d = d_prime in
+    let k_prime = Message.derive m ~public_key ~private_key:d in
+    assert (not Curve.Scalar.(equal k_prime zero)) ;
+    let r, (ry : Impl.Field.t) =
+      Curve.(to_affine_exn (scale Curve.one k_prime))
+    in
+    let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
+    let e = Message.hash m ~public_key ~r in
+    let s = Curve.Scalar.(k + (e * d)) in
+    (r, s)
+end
 
 [%%endif]

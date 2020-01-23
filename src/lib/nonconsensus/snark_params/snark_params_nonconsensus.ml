@@ -42,7 +42,7 @@ curve_size]
 module Field = struct
   include Field0
 
-  let size = order |> Nat.to_string |> Bigint.of_string
+  let size = order |> Snarkette.Nat.to_string |> Bigint.of_string
 
   let size_in_bits = length_in_bits
 
@@ -55,7 +55,7 @@ end
 
 module Tock = struct
   module Field = struct
-    type t = Bigint.t
+    type t = Snarkette.Nat.t
 
     let unpack _t = Obj.magic 42
 
@@ -64,22 +64,41 @@ module Tock = struct
 end
 
 module Inner_curve = struct
-  open Field
-  module Coefficients = G1.Coefficients
+  [%%if
+  curve_size = 298]
 
-  let find_y (x : Field.t) =
+  module Mnt4 = Mnt4_80
+
+  [%%elif
+  curve_size = 753]
+
+  module Mnt4 = Mnt4753
+
+  [%%else]
+
+  [%%error
+  "invalid value for \"curve_size\""]
+
+  [%%endif]
+
+  type t = Mnt4.G1.t
+
+  module Coefficients = Mnt4.G1.Coefficients
+
+  let find_y (x : t) =
+    let open Mnt4.G1 in
     let y2 = (x * square x) + (Coefficients.a * x) + Coefficients.b in
     if is_square y2 then Some (sqrt y2) else None
 
   [%%define_locally
-  G1.(to_affine_exn, of_affine)]
+  Mnt4.G1.(to_affine_exn, of_affine, one, scale)]
 
   module Scalar = struct
-    (* though we have bin_io, not versioned here; this type exists for Private_key.t, 
+    (* though we have bin_io, not versioned here; this type exists for Private_key.t,
        where it is versioned-asserted and its serialization tested
        we make linter error a warning
      *)
-    type t = Bigint.t [@@deriving bin_io, sexp]
+    type t = Snarkette.Nat.t [@@deriving bin_io, sexp]
 
     type _unused = unit constraint t = Tock.Field.t
 
@@ -89,9 +108,14 @@ module Inner_curve = struct
         "475922286169261325753349249653048451545124879242694725395555128576210262817955800483758081"
 
     [%%define_locally
-    Bigint.(to_string, of_string, equal, compare, hash_fold_t, one)]
+    Snarkette.Nat.(to_string, of_string, equal, compare, hash_fold_t, one)]
 
-    let gen = Bigint.(gen_uniform_incl one (size - one))
+    let zero = Snarkette.Nat.of_int 0
+
+    let gen =
+      let open Core_kernel.Quickcheck.Generator.Let_syntax in
+      let%map n = Bigint.(gen_uniform_incl one (size - one)) in
+      Bigint.to_string n |> Snarkette.Nat.of_string
 
     let of_bits bits = Tock.Field.project bits
   end
